@@ -1,77 +1,61 @@
-import java.util.*; 
-import java.util.concurrent.*; 
+import java.util.concurrent.locks.*;
 
-class TokenRing { 
-    static final int NUM_PROCESSES = 3; 
-    static final int MAX_ITERATIONS = 1; // Number of times each process accesses critical section
-    static List<Process> processes = new ArrayList<>(); 
-    static Semaphore mutex = new Semaphore(1); 
-    static int tokenHolder = 0; 
-    static Random random = new Random(); 
+public class TokenRing {
+    private static final int NUM_PROCESSES = 5;  // Number of processes in the ring
+    private static final int CRITICAL_SECTION_DELAY = 1000;  // Simulate critical section delay
 
-    public static void main(String[] args) throws InterruptedException { 
-        List<Thread> threads = new ArrayList<>();
-        
-        for (int i = 0; i < NUM_PROCESSES; i++) { 
-            Process p = new Process(i); 
-            processes.add(p); 
-            Thread t = new Thread(p);
-            threads.add(t);
-            t.start(); 
-        } 
-        
-        // Wait for all threads to complete
-        for (Thread t : threads) {
-            t.join();
+    private static Process[] processes = new Process[NUM_PROCESSES];
+    private static int tokenHolder = 0;  // Process holding the token
+
+    public static void main(String[] args) {
+        // Initialize processes
+        for (int i = 0; i < NUM_PROCESSES; i++) {
+            processes[i] = new Process(i);
         }
 
-        System.out.println("All processes have completed their execution.");
-    } 
+        // Start processes
+        for (int i = 0; i < NUM_PROCESSES; i++) {
+            new Thread(processes[i]).start();
+        }
+    }
 
-    static class Process implements Runnable { 
-        int id; 
+    // Process Class represents each node in the Token Ring
+    static class Process implements Runnable {
+        private int processId;  // Process ID
 
-        Process(int id) { 
-            this.id = id; 
-        } 
+        public Process(int processId) {
+            this.processId = processId;
+        }
 
-        public void run() { 
-            for (int i = 0; i < MAX_ITERATIONS; i++) { 
-                try { 
-                    Thread.sleep(random.nextInt(1000)); // Simulate random wait 
-                    requestToken(); 
-                    enterCriticalSection(i); 
-                    releaseToken(); 
-                    Thread.sleep(random.nextInt(1000)); 
-                } catch (InterruptedException e) { 
-                    e.printStackTrace(); 
-                } 
-            } 
-            System.out.println("Process " + id + " has finished its operations.");
-        } 
+        @Override
+        public void run() {
+            while (true) {
+                if (processId == tokenHolder) {
+                    enterCriticalSection();
+                    passToken();
+                }
+                try {
+                    Thread.sleep(500);  // Simulate waiting time before checking token
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
 
-        void requestToken() throws InterruptedException { 
-            mutex.acquire(); 
-            while (tokenHolder != id) { 
-                System.out.println("Process " + id + " waiting for the token."); 
-                mutex.release(); 
-                Thread.sleep(100); 
-                mutex.acquire(); 
-            } 
-            System.out.println("Process " + id + " acquired the token."); 
-            mutex.release(); 
-        } 
+        private void enterCriticalSection() {
+            System.out.println("Process " + processId + " entering critical section.");
+            try {
+                // Simulate some work in the critical section
+                Thread.sleep(CRITICAL_SECTION_DELAY);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println("Process " + processId + " leaving critical section.");
+        }
 
-        void enterCriticalSection(int iteration) throws InterruptedException { 
-            System.out.println("Process " + id + " entering critical section. [Iteration: " + (iteration + 1) + "]"); 
-            Thread.sleep(random.nextInt(500)); 
-        } 
-
-        void releaseToken() throws InterruptedException { 
-            mutex.acquire(); 
-            System.out.println("Process " + id + " exiting critical section and passing token."); 
-            tokenHolder = (tokenHolder + 1) % NUM_PROCESSES; 
-            mutex.release(); 
-        } 
-    } 
+        private synchronized void passToken() {
+            tokenHolder = (tokenHolder + 1) % NUM_PROCESSES;  // Pass the token to the next process
+            System.out.println("Process " + processId + " passed the token to Process " + tokenHolder);
+        }
+    }
 }
